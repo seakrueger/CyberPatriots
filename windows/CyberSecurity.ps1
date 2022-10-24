@@ -213,8 +213,8 @@ function Disable-DefaultAccounts {
     Get-LocalUser Administrator | Disable-LocalUser
     (Get-WMIObject Win32_UserAccount -Filter "Name='Administrator'").Rename("DisAd")
     (Get-WMIObject Win32_UserAccount -Filter "Name='Guest'").Rename("DisGu")
-    Write-Host "`nAdmin Account has been renamed to 'DisAd'" -ForegroundColor Blue -BackgroundColor White
-    Write-Host "Guest Account has been renamed to 'DisGu'" -ForegroundColor Blue -BackgroundColor White
+    Write-Host "`nAdmin Account has been renamed to 'DisAd'" -ForegroundColor Yellow
+    Write-Host "Guest Account has been renamed to 'DisGu'" -ForegroundColor Yellow
 }
 
 
@@ -349,3 +349,77 @@ function Exit-Script {
     Write-Host "`n`n --- SOME OF THIS MAY NEED A RESTART TO TAKE AFFECT --- SAME OF THIS MAY NEED A RESTART TO TAKE AFFECT ---`n" -ForegroundColor Red -BackgroundColor White
     exit
 }
+
+#============================================
+# Start
+#============================================
+function Start-Script {
+    Clear-Host
+    Write-Host "
+____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _______.
+\   \  /  \  /   / |  | |  \ |  | |       \ /  __  \  \   \  /  \  /   /  /       |
+ \   \/    \/   /  |  | |   \|  | |  .--.  |  |  |  |  \   \/    \/   /  |   (----`
+  \            /   |  | |  . `  | |  |  |  |  |  |  |   \            /    \   \    
+   \    /\    /    |  | |  |\   | |  '--'  |  `--'  |    \    /\    / .----)   |   
+    \__/  \__/     |__| |__| \__| |_______/ \______/      \__/  \__/  |_______/    
+                                                                                   
+    "
+    $option = Read-Host '
+    1. Run All              
+    2. Remove Unapproved Users          3. Add Missing Users
+    4. Remove Unapproved Admins         5. Add Missing Admins
+    6. Disabled Default Accounts        7. Enabled Password Policy
+    8. Update Passwords                 9. Enable Firewall
+    10. Enable Windows Defender         11. Run Vius Scan
+                                        12. Exit'
+
+    if ($option -eq 1) {
+        Clear-UnapprovedUsers
+        Add-MissingUsers
+        Clear-UnapprovedAdmins
+        Add-MissingAdmins
+        Enable-PasswordPolicy
+        Disable-DefaultAccounts
+        Update-Passwords
+        Enable-Firewall
+        Enable-Defender
+        Start-VirusScan
+    }
+    if ($option -eq 2) {
+        Clear-UnapprovedUsers
+    }
+    if ($option -eq 3) {
+        Add-MissingUsers
+    }
+    if ($option -eq 4) {
+        Clear-UnapprovedAdmins
+    }
+    if ($option -eq 5) {
+        Add-MissingAdmins
+    }
+    if ($option -eq 6) {
+        Disable-DefaultAccounts
+    }
+    if ($option -eq 7) {
+        Enable-PasswordPolicy
+    }
+    if ($option -eq 8) {
+        Update-Passwords
+    }
+    if ($option -eq 9) {
+        Enable-Firewall
+    }
+    if ($option -eq 10) {
+        Enable-Defender
+    }
+    if ($option -eq 11) {
+        Run-VirusScan
+    }
+    if ($optin -ge 12) {
+        Exit-Script
+    }
+
+    Start-Script
+}
+
+Start-Script
