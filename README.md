@@ -5,19 +5,24 @@ Scripts for the CyberPatriots competition
 A Powershell script to a common set of challenges during the competition
 
 ### Set-Up
-Download and unzip this repository to some location in the VM
+1. Download and unzip this repository to some location in the VM
 
-Paste the list of approved usernames and admins into the users.txt file 
-Paste the list of approved admins into the admins.txt file
-Each name should be on a new line, make sure there is not space after the name.
+2. Paste the list of approved usernames and admins into the users.txt file 
 
-Open a powershell terminal **as Administrator** 
+3. Paste the list of approved admins into the admins.txt file
 
-Run: `Set-ExecutionPolicy unrestricted -Scope Process`
+Notes: 
+  - Each name should be on a new line
+  - Make sure there is not space after the name 
+
+4. Open a powershell terminal **as Administrator** 
+
+5. Run: `Set-ExecutionPolicy unrestricted -Scope Process`
 
 ### Running
-Run: `./CyberSecurity.ps1` 
+1. Run: `./CyberSecurity.ps1` 
 
-If the script is unable to find the path to any of the files run using `./CyberSecurity.ps1 -userfile {pathToFile} -adminfile {pathToFile} -secfile {pathToFile}`
+Notes: 
+ - If the script is unable to find the path to any of the files run using `./CyberSecurity.ps1 -userfile {pathToFile} -adminfile {pathToFile} -secfile {pathToFile}`
 
-From there select what you want the script to do, use option 1 to run everything  
+2. From there select what you want the script to do, use option 1 to run everything  
