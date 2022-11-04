@@ -756,8 +756,11 @@ function Disable-IIS {
 	dism /online /disable-feature /featurename:IIS-LegacyScripts
 	dism /online /disable-feature /featurename:IIS-LegacySnapIn
 
-    dism /online /disable-feature /featurename:"SMB1Protocol"
-    Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+    $confirmation = Read-Host "Disable SMB? [y/n]"
+    if ($confirmation -eq "y") {
+        dism /online /disable-feature /featurename:"SMB1Protocol"
+        Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+    }
 }
 
 #============================================
