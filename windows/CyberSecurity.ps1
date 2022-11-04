@@ -203,6 +203,50 @@ function Add-MissingAdmins {
     }
 }
 
+#============================================
+# Add New Group
+#============================================
+# Manages defualt group 
+#  account and renmaes them
+#============================================
+function Add-NewGroup {
+    Write-Host "`n--- Managing Group ---" -ForegroundColor Blue -BackgroundColor White
+
+    $confirmation = Read-Host "Manage/Create/Update a user group? [y/n]"
+    if ($confirmation -eq "y") {
+        $groupName = Read-Host "Group Name? (case sensitive)"
+        try {
+            $group = Get-LocalGroup -Name $groupName
+            Write-Host "Group $($group.Name) was found" -ForegroundColor Yellow
+        }
+        catch [Microsoft.PowerShell.Commands.GroupNotFoundException] {
+            New-LocalGroup -Name $groupName
+            $group = Get-LocalGroup -Name $groupName
+
+            Write-Host "Created Group $($group.Name)" -ForegroundColor Yellow
+        }
+
+        Write-Host "--- SELECT LOCAL USERS ---" -ForegroundColor Yellow
+        $i = 0
+        Get-LocalUser | ForEach-Object -Process {Write-Host ($i.ToString() + ") " + $_.Name); $i += 1}
+
+        [string[]] $userList= @()
+        $userList = Read-Host "Which Users should be in the group? [E.g: 0, 2, 3]"
+        $userList = $userList.Split(',').Split(' ')
+
+        $i = 0
+        Get-LocalUser | ForEach-Object -Process {
+            if ($userList.Contains($i.ToString())) {
+                Add-LocalGroupMember -Group $group -Member $_
+            } else {
+                try {
+                    Remove-LocalGroupMember -Group $group -Member $_
+                }
+                catch { }
+            }
+        }
+    }
+}
 
 #============================================
 # Disable Default Accounts
@@ -242,12 +286,20 @@ function Enable-PasswordPolicy {
     reg ADD HKLM\SYSTEM\CurrentControlSet\services\LanmanServer\Parameters /v autodisconnect /t REG_DWORD /d 45 /f
     reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v DisablePasswordChange /t REG_DWORD /d 1 /f
     reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v RequireStrongKey /t REG_DWORD /d 1 /f
-
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\LanmanWorkstation\Parameters /v EnablePlainTextPassword /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\LSASS.exe" /v AuditLevel /t REG_DWORD /d 00000008 /f
+    reg add HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v RunAsPPL /t REG_DWORD /d 00000001 /f
 
     Write-Host "`n--- Disabling Anonymous Users ---" -ForegroundColor Yellow
     reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v restrictanonymous /t REG_DWORD /d 1 /f
     reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v restrictanonymoussam /t REG_DWORD /d 1 /f
     reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v everyoneincludesanonymous /t REG_DWORD /d 0 /f
+
+    $confirmation = Read-Host "Require Security Signature? [y/n]"
+    if ($confirmation -eq "y") {
+        reg ADD HKLM\SYSTEM\CurrentControlSet\services\LanmanServer\Parameters /v enablesecuritysignature /t REG_DWORD /d 0 /f
+        reg ADD HKLM\SYSTEM\CurrentControlSet\services\LanmanServer\Parameters /v requiresecuritysignature /t REG_DWORD /d 0 /f
+    }
 
     Write-Output (net.exe accounts)
 }
@@ -412,6 +464,11 @@ function Enable-Firewall {
     Set-NetConnectionProfile -NetworkCategory Public
     Remove-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24" -Name "Category" -ErrorAction SilentlyContinue
 
+    
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v RequireSignOrSeal /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v SignSecureChannel /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v SealSecureChannel /t REG_DWORD /d 1 /f
+
     Write-Output (Get-NetFirewallProfile | Format-Table Name, Enabled)
 }
 
@@ -517,6 +574,87 @@ function Disable-IIS {
 }
 
 #============================================
+# Enable Internet Security
+#============================================
+# Enables IE9 and other internet blocking
+#  featues in windows
+#============================================
+function Enable-InternetSecurity {
+    Write-Host "`n--- Enabling Internet Proection Features ---" -ForegroundColor Blue -BackgroundColor White
+
+    # Internet Explorer
+    reg ADD "HKCU\Software\Microsoft\Internet Explorer\PhishingFilter" /v EnabledV8 /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Internet Explorer\PhishingFilter" /v EnabledV9 /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v DisablePasswordCaching /t REG_DWORD /d 1 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\Internet Explorer\PhishingFilter" /v "EnabledV9" /t REG_DWORD /d 1 /f
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Internet Explorer\PhishingFilter" /v "EnabledV9" /t REG_DWORD /d 1 /f
+
+    reg ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v WarnonBadCertRecving /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v WarnOnPostRedirect /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Internet Explorer\Main" /v DoNotTrack /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Internet Explorer\Download" /v RunInvalidSignatures /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_LOCALMACHINE_LOCKDOWN\Settings" /v LOCALMACHINE_CD_UNLOCK /t REG_DWORD /d 1 /f
+    reg ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v WarnonZoneCrossing /t REG_DWORD /d 1 /f
+
+
+}
+
+#============================================
+# Enable File Security
+#============================================
+# Enables UAC and installer security,
+#  and registry protection
+#============================================
+function Enable-FileSecurity {
+    Write-Host "`n--- Enabling File System Security ---" -ForegroundColor Blue -BackgroundColor White
+
+    # Detachable Storage
+    reg ADD "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AllocateCDRoms /t REG_DWORD /d 1 /f
+    reg ADD "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AllocateFloppies /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v undockwithoutlogon /t REG_DWORD /d 0 /f
+
+	reg ADD "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v ClearPageFileAtShutdown /t REG_DWORD /d 1 /f
+	reg ADD "HKLM\SYSTEM\CurrentControlSet\Control\Print\Providers\LanMan Print Services\Servers" /v AddPrinterDrivers /t REG_DWORD /d 1 /f
+
+    # UAC
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 1 /f
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Type DWord -Value 5
+	Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "PromptOnSecureDesktop" -Type DWord -Value 1
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v PromptOnSecureDesktop /t REG_DWORD /d 1 /f
+
+    # Installers
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableInstallerDetection /t REG_DWORD /d 1 /f
+    reg ADD HKCU\SYSTEM\CurrentControlSet\Services\CDROM /v AutoRun /t REG_DWORD /d 1 /f
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v "NoAutorun" /t REG_DWORD /d 1 /f
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v "NoDriveTypeAutoRun" /t REG_DWORD /d 255 /f
+    
+    # Hidden Files
+    reg ADD HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v Hidden /t REG_DWORD /d 1 /f
+    reg ADD HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v ShowSuperHidden /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\CrashControl /v CrashDumpEnabled /t REG_DWORD /d 0 /f
+
+    # Microsoft Office Suite
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\access\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\excel\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\excel\security" /v "blockcontentexecutionfrominternet" /t REG_DWORD /d 1 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\excel\security" /v "excelbypassencryptedmacroscan" /t REG_DWORD /d 0 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\ms project\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\ms project\security" /v "level" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\outlook\security" /v "level" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\powerpoint\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\powerpoint\security" /v "blockcontentexecutionfrominternet" /t REG_DWORD /d 1 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\publisher\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\visio\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\visio\security" /v "blockcontentexecutionfrominternet" /t REG_DWORD /d 1 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\word\security" /v "vbawarnings" /t REG_DWORD /d 4 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\word\security" /v "blockcontentexecutionfrominternet" /t REG_DWORD /d 1 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\16.0\word\security" /v "wordbypassencryptedmacroscan" /t REG_DWORD /d 0 /f
+    reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\office\common\security" /v "automationsecurity" /t REG_DWORD /d 3 /f
+
+}
+
+
+#============================================
 # Enable Windows Defender
 #============================================
 # Enables Windows Defender and then checks
@@ -574,6 +712,27 @@ function Start-VirusScan {
 }
 
 #============================================
+# Enable Windows Updates
+#============================================
+# Enables windows auto update for minor
+#  releases
+#============================================
+function Enable-WindowsUpdates {
+    Write-Host "`n--- Enabling Windows Update Policy ---" -ForegroundColor Blue -BackgroundColor White
+
+    reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /v AutoInstallMinorUpdates /t REG_DWORD /d 1 /f
+    reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /v NoAutoUpdate /t REG_DWORD /d 0 /f
+    reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /v AUOptions /t REG_DWORD /d 4 /f
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" /v AUOptions /t REG_DWORD /d 4 /f
+    reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /v DisableWindowsUpdateAccess /t REG_DWORD /d 0 /f
+    reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /v ElevateNonAdmins /t REG_DWORD /d 0 /f
+    reg add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer /v NoWindowsUpdate /t REG_DWORD /d 0 /f
+    reg add "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t REG_DWORD /d 0 /f
+    reg add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate /v DisableWindowsUpdateAccess /t REG_DWORD /d 0 /f
+
+}
+
+#============================================
 # Exit
 #============================================
 function Exit-Script {
@@ -596,30 +755,49 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
                                                                                    
     "
     $option = Read-Host '
-    1. Run All              
-    2. Remove Unapproved Users          3. Add Missing Users
-    4. Remove Unapproved Admins         5. Add Missing Admins
-    6. Disabled Default Accounts        7. Enabled Password Policy
-    8. Update Passwords                 9. Enable Audit Policy
-    10. Enable Firewall                 11. Disable Remote Desktop
-    12. Disable IIS                     13. Enable Windows Defender
-    14. Run Vius Scan
-                                        15. Exit'
+
+    1. Run All
+
+    -- Users --
+    2. Remove Unapproved Users              3. Add Missing Users
+    4. Remove Unapproved Admins             5. Add Missing Admins
+    6. Manage Group
+    
+    -- Security --
+    7. Disabled Default Accounts            8. Enabled Password Policy
+    9. Update Passwords                     10. Enable Audit Policy
+    11. Enable Firewall                     12. Disable IIS
+    13. Enable Internet Security            14. Enable File Security            
+    
+    -- Services --
+    15. Disable Remote Desktop
+
+    -- Windows --
+    16. Enable Windows Defender             17. Run Vius Scan
+    18. Enable Windows Updates
+
+    -- Exit --
+    19. Exit'
 
     if ($option -eq 1) {
         Clear-UnapprovedUsers
         Add-MissingUsers
         Clear-UnapprovedAdmins
         Add-MissingAdmins
+        Add-NewGroup
         Enable-PasswordPolicy
         Disable-DefaultAccounts
         Update-Passwords
         Enable-AuditPolicy
         Enable-Firewall
-        Disable-RemoteDesktop
         Disable-IIS
+        Enable-InternetSecurity
+        Enable-FileSecurity
+        Disable-RemoteDesktop
         Enable-Defender
         Start-VirusScan
+        Enable-WindowsUpdates
+        Start-Sleep -s 2
     }
     if ($option -eq 2) {
         Clear-UnapprovedUsers
@@ -634,33 +812,45 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Add-MissingAdmins
     }
     if ($option -eq 6) {
-        Disable-DefaultAccounts
+        Add-NewGroup
     }
     if ($option -eq 7) {
-        Enable-PasswordPolicy
+        Disable-DefaultAccounts
     }
     if ($option -eq 8) {
-        Update-Passwords
+        Enable-PasswordPolicy
     }
     if ($option -eq 9) {
-        Enable-AuditPolicy
+        Update-Passwords
     }
     if ($option -eq 10) {
-        Enable-Firewall
+        Enable-AuditPolicy
     }
     if ($option -eq 11) {
-        Disable-RemoteDesktop
+        Enable-Firewall
     }
     if ($option -eq 12) {
         Disable-IIS
     }
     if ($option -eq 13) {
-        Enable-Defender
+        Enable-InternetSecurity
     }
     if ($option -eq 14) {
-        Start-VirusScan
+        Enable-FileSecurity
     }
     if ($option -eq 15) {
+        Disable-RemoteDesktop
+    }
+    if ($option -eq 16) {
+        Enable-Defender
+    }
+    if ($option -eq 17) {
+        Start-VirusScan
+    }
+    if ($option -eq 18) {
+        Enable-WindowsUpdates
+    }
+    if ($option -eq 19) {
         Exit-Script
     }
 }
