@@ -217,14 +217,14 @@ function Add-NewGroup {
         $groupName = Read-Host "Group Name? (case sensitive)"
         try {
             $group = Get-LocalGroup -Name $groupName
-            Write-Host "Group $($group.Name) was found" -ForegroundColor Yellow
         }
-        catch [Microsoft.PowerShell.Commands.GroupNotFoundException] {
+        catch [Microsoft.PowerShell.Commands.GetLocalGroupCommand] {
             New-LocalGroup -Name $groupName
             $group = Get-LocalGroup -Name $groupName
 
             Write-Host "Created Group $($group.Name)" -ForegroundColor Yellow
         }
+        Write-Host "Group $($group.Name) was found" -ForegroundColor Yellow
 
         Write-Host "--- SELECT LOCAL USERS ---" -ForegroundColor Yellow
         $i = 0
@@ -399,13 +399,21 @@ function Enable-Firewall {
         dism /online /disable-feature /featurename:IIS-FTPServer
 	    dism /online /disable-feature /featurename:IIS-FTPSvc
 	    dism /online /disable-feature /featurename:IIS-FTPExtensibility
-	    dism /online /disable-feature /featurename:TFTP    
+	    dism /online /disable-feature /featurename:TFTP
+        cmd.exe /c 'sc stop Msftpsvc'
+        cmd.exe /c 'sc config Msftpsvc start=disabled'
+        cmd.exe /c 'sc stop ftpsvc'
+        cmd.exe /c 'sc config ftpsvc start=disabled'
     } else {
         New-NetFirewallRule -DisplayName "ftpTCP" -Direction Inbound -LocalPort 21 -Protocol TCP -Action Allow
         dism /online /enable-feature /featurename:IIS-FTPServer
 	    dism /online /enable-feature /featurename:IIS-FTPSvc
 	    dism /online /enable-feature /featurename:IIS-FTPExtensibility
 	    dism /online /enable-feature /featurename:TFTP
+        cmd.exe /c 'sc start Msftpsvc'
+        cmd.exe /c 'sc config Msftpsvc start=enabled'
+        cmd.exe /c 'sc start ftpsvc'
+        cmd.exe /c 'sc config ftpsvc start=enabled'
     }
     
     # SSH
@@ -423,11 +431,15 @@ function Enable-Firewall {
         netsh advfirewall firewall set rule name="Telnet Server" new enable=no 
         dism /online /disable-feature /featurename:TelnetClient
 	    dism /online /disable-feature /featurename:TelnetServer
+        cmd.exe /c 'sc stop tlntsvr'
+        cmd.exe /c 'sc config tlntsvr start=disabled'
     } else {
         New-NetFirewallRule -DisplayName "telnetTCP" -Direction Inbound -LocalPort 23 -Protocol TCP -Action Allow
         netsh advfirewall firewall set rule name="Telnet Server" new enable=yes
         dism /online /enable-feature /featurename:TelnetClient
 	    dism /online /enable-feature /featurename:TelnetServer
+        cmd.exe /c 'sc start tlntsvr'
+        cmd.exe /c 'sc config tlntsvr start=enabled'
     }
 
     # SMTP
@@ -438,7 +450,7 @@ function Enable-Firewall {
         New-NetFirewallRule -DisplayName "SMTPTCP" -Direction Inbound -LocalPort 25 -Protocol TCP -Action Allow
     }
     
-    # SMTP
+    # POP3
     $confirmation = Read-Host "Disable POP3? [y/n]"
     if ($confirmation -eq "y") {
         New-NetFirewallRule -DisplayName "POP3TCP" -Direction Inbound -LocalPort 110 -Protocol TCP -Action Block
@@ -450,15 +462,12 @@ function Enable-Firewall {
     $confirmation = Read-Host "Disable SNMP? [y/n]"
     if ($confirmation -eq "y") {
         New-NetFirewallRule -DisplayName "SNMPTCP" -Direction Inbound -LocalPort 161 -Protocol TCP -Action Block
+        cmd.exe /c 'sc stop snmptrap'
+        cmd.exe /c 'sc config snmptrap start=disabled'
     } else {
         New-NetFirewallRule -DisplayName "SNMPTCP" -Direction Inbound -LocalPort 161 -Protocol TCP -Action Allow
-    }
-
-    $confirmation = Read-Host "Disable RDP? [y/n]"
-    if ($confirmation -eq "y") {
-        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Block
-    } else {
-        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow
+        cmd.exe /c 'sc start snmptrap'
+        cmd.exe /c 'sc config snmptrap start=enable'
     }
 
     Set-NetConnectionProfile -NetworkCategory Public
@@ -481,8 +490,10 @@ function Enable-Firewall {
 function Disable-RemoteDesktop {
     Write-Host "`n--- Disabling Remote Desktop ---" -ForegroundColor Blue -BackgroundColor White
     # Remote Assistance
-    $confirmation = Read-Host "Disable Remote Assistance? [y/n]"
+    $confirmation = Read-Host "Disable Remote Desktop? [y/n]"
     if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Block
+
         netsh advfirewall firewall set rule name="Remote Assistance (DCOM-In)" new enable=no 
         netsh advfirewall firewall set rule name="Remote Assistance (PNRP-In)" new enable=no 
         netsh advfirewall firewall set rule name="Remote Assistance (RA Server TCP-In)" new enable=no 
@@ -511,6 +522,17 @@ function Disable-RemoteDesktop {
         reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\RemoteAdminSettings" /v "Enabled" /t REG_DWORD /d 0 /f
         reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\Services\RemoteDesktop" /v "Enabled" /t REG_DWORD /d 0 /f
         reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\Services\UPnPFramework" /v "Enabled" /t REG_DWORD /d 0 /f
+
+        cmd.exe /c 'sc stop termservice'
+        cmd.exe /c 'sc config termservice start=disabled'
+        cmd.exe /c 'sc stop sessionenv'
+        cmd.exe /c 'sc config sessionenv start=disabled'
+    } else {
+        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow
+        cmd.exe /c 'sc start termservice'
+        cmd.exe /c 'sc config termservice start=enabled'
+        cmd.exe /c 'sc start sessionenv'
+        cmd.exe /c 'sc config sessionenv start=enabled'
     }
 }
 
