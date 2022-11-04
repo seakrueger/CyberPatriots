@@ -389,8 +389,14 @@ function Enable-Firewall {
         netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=yes
     }
     
-    netsh advfirewall firewall add rule name="block_RemoteRegistry_in" dir=in service="RemoteRegistry" action=block enable=yes
-    netsh advfirewall firewall add rule name="block_RemoteRegistry_out" dir=out service="RemoteRegistry" action=block enable=yes
+    # Remote Registry
+    $confirmation = Read-Host "Disable Remote Registry? [y/n]"
+    if ($confirmation -eq "y") {
+        netsh advfirewall firewall add rule name="block_RemoteRegistry_in" dir=in service="RemoteRegistry" action=block enable=yes
+        netsh advfirewall firewall add rule name="block_RemoteRegistry_out" dir=out service="RemoteRegistry" action=block enable=yes
+        cmd.exe /c 'sc stop remoteregistry'
+	    cmd.exe /c 'sc config remoteregistry start=disabled'
+    }
 
     # FTP
     $confirmation = Read-Host "Disable FTP? [y/n]"
@@ -527,13 +533,172 @@ function Disable-RemoteDesktop {
         cmd.exe /c 'sc config termservice start=disabled'
         cmd.exe /c 'sc stop sessionenv'
         cmd.exe /c 'sc config sessionenv start=disabled'
+        cmd.exe /c 'sc stop upnphos'
+	    cmd.exe /c 'sc config upnphos start=disabled'
+        cmd.exe /c 'sc stop RemoteAccess'
+	    cmd.exe /c 'sc config RemoteAccess start=disabled'
+        cmd.exe /c 'sc stop mnmsrvc'
+	    cmd.exe /c 'sc config mnmsrvc start=disabled'
     } else {
         New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow
         cmd.exe /c 'sc start termservice'
         cmd.exe /c 'sc config termservice start=enabled'
         cmd.exe /c 'sc start sessionenv'
         cmd.exe /c 'sc config sessionenv start=enabled'
+        cmd.exe /c 'sc start upnphos'
+	    cmd.exe /c 'sc config upnphos start=enabled'
+        cmd.exe /c 'sc start RemoteAccess'
+	    cmd.exe /c 'sc config RemoteAccess start=enabled'
+        cmd.exe /c 'sc start mnmsrvc'
+	    cmd.exe /c 'sc config mnmsrvc start=enabled'
+
     }
+}
+
+function Disable-UnsafeServices {
+    Write-Host "`n--- Disabling Unsafe Services ---" -ForegroundColor Blue -BackgroundColor White
+
+    $confirmation = Read-Host "Disable Uncommon Services? [y/n]
+    THIS IS HEAVILY UNTESTED -- RUN AT YOUR OWN RISK"
+    if ($confirmation -eq "y") {
+        cmd.exe /c 'sc stop NetTcpPortSharing'
+        cmd.exe /c 'sc config NetTcpPortSharing start= disabled'
+        cmd.exe /c 'sc stop RasMan'
+        cmd.exe /c 'sc config RasMan start= disabled'
+        cmd.exe /c 'sc stop TabletInputService'
+        cmd.exe /c 'sc config TabletInputService start= disabled'
+        cmd.exe /c 'sc stop RpcSs'
+        cmd.exe /c 'sc config RpcSs start= disabled'
+        cmd.exe /c 'sc stop SENS'
+        cmd.exe /c 'sc config SENS start= disabled'
+        cmd.exe /c 'sc stop EventSystem'
+        cmd.exe /c 'sc config EventSystem start= disabled'
+        cmd.exe /c 'sc stop XblAuthManager'
+        cmd.exe /c 'sc config XblAuthManager start= disabled'
+        cmd.exe /c 'sc stop XblGameSave'
+        cmd.exe /c 'sc config XblGameSave start= disabled'
+        cmd.exe /c 'sc stop XboxGipSvc'
+        cmd.exe /c 'sc config XboxGipSvc start= disabled'
+        cmd.exe /c 'sc stop xboxgip'
+        cmd.exe /c 'sc config xboxgip start= disabled'
+        cmd.exe /c 'sc stop xbgm'
+        cmd.exe /c 'sc config xbgm start= disabled'
+        cmd.exe /c 'sc stop SysMain'
+        cmd.exe /c 'sc config SysMain start= disabled'
+        cmd.exe /c 'sc stop seclogon'
+        cmd.exe /c 'sc config seclogon start= disabled'
+        cmd.exe /c 'sc stop TapiSrv'
+        cmd.exe /c 'sc config TapiSrv start= disabled'
+        cmd.exe /c 'sc stop p2pimsvc'
+        cmd.exe /c 'sc config p2pimsvc start= disabled'
+        cmd.exe /c 'sc stop simptcp'
+        cmd.exe /c 'sc config simptcp start= disabled'
+        cmd.exe /c 'sc stop fax'
+        cmd.exe /c 'sc config fax start= disabled'
+        cmd.exe /c 'sc stop Msftpsvc'
+        cmd.exe /c 'sc config Msftpsvc start= disabled'
+        cmd.exe /c 'sc stop iprip'
+        cmd.exe /c 'sc config iprip start= disabled'
+        cmd.exe /c 'sc stop ftpsvc'
+        cmd.exe /c 'sc config ftpsvc start= disabled'
+        cmd.exe /c 'sc stop RasAuto'
+        cmd.exe /c 'sc config RasAuto start= disabled'
+        cmd.exe /c 'sc stop W3svc'
+        cmd.exe /c 'sc config W3svc start= disabled'
+        cmd.exe /c 'sc stop Smtpsvc'
+        cmd.exe /c 'sc config Smtpsvc start= disabled'
+        cmd.exe /c 'sc stop Dfs'
+        cmd.exe /c 'sc config Dfs start= disabled'
+        cmd.exe /c 'sc stop TrkWks'
+        cmd.exe /c 'sc config TrkWks start= disabled'
+        cmd.exe /c 'sc stop MSDTC'
+        cmd.exe /c 'sc config MSDTC start= disabled'
+        cmd.exe /c 'sc stop ERSvc'
+        cmd.exe /c 'sc config ERSvc start= disabled'
+        cmd.exe /c 'sc stop NtFrs'
+        cmd.exe /c 'sc config NtFrs start= disabled'
+        cmd.exe /c 'sc stop Iisadmin'
+        cmd.exe /c 'sc config Iisadmin start= disabled'
+        cmd.exe /c 'sc stop IsmServ'
+        cmd.exe /c 'sc config IsmServ start= disabled'
+        cmd.exe /c 'sc stop WmdmPmSN'
+        cmd.exe /c 'sc config WmdmPmSN start= disabled'
+        cmd.exe /c 'sc stop helpsvc'
+        cmd.exe /c 'sc config helpsvc start= disabled'
+        cmd.exe /c 'sc stop Spooler'
+        cmd.exe /c 'sc config Spooler start= disabled'
+        cmd.exe /c 'sc stop RDSessMgr'
+        cmd.exe /c 'sc config RDSessMgr start= disabled'
+        cmd.exe /c 'sc stop RSoPProv'
+        cmd.exe /c 'sc config RSoPProv start= disabled'
+        cmd.exe /c 'sc stop SCardSvr'
+        cmd.exe /c 'sc config SCardSvr start= disabled'
+        cmd.exe /c 'sc stop lanmanserver'
+        cmd.exe /c 'sc config lanmanserver start= disabled'
+        cmd.exe /c 'sc stop Sacsvr'
+        cmd.exe /c 'sc config Sacsvr start= disabled'
+        cmd.exe /c 'sc stop TermService'
+        cmd.exe /c 'sc config TermService start= disabled'
+        cmd.exe /c 'sc stop uploadmgr'
+        cmd.exe /c 'sc config uploadmgr start= disabled'
+        cmd.exe /c 'sc stop VDS'
+        cmd.exe /c 'sc config VDS start= disabled'
+        cmd.exe /c 'sc stop VSS'
+        cmd.exe /c 'sc config VSS start= disabled'
+        cmd.exe /c 'sc stop WINS'
+        cmd.exe /c 'sc config WINS start= disabled'
+        cmd.exe /c 'sc stop CscService'
+        cmd.exe /c 'sc config CscService start= disabled'
+        cmd.exe /c 'sc stop hidserv'
+        cmd.exe /c 'sc config hidserv start= disabled'
+        cmd.exe /c 'sc stop IPBusEnum'
+        cmd.exe /c 'sc config IPBusEnum start= disabled'
+        cmd.exe /c 'sc stop PolicyAgent'
+        cmd.exe /c 'sc config PolicyAgent start= disabled'
+        #cmd.exe /c 'sc stop SCPolicySvc'
+        #cmd.exe /c 'sc config SCPolicySvc start= disabled'
+        cmd.exe /c 'sc stop SharedAccess'
+        cmd.exe /c 'sc config SharedAccess start= disabled'
+        cmd.exe /c 'sc stop SSDPSRV'
+        cmd.exe /c 'sc config SSDPSRV start= disabled'
+        cmd.exe /c 'sc stop Themes'
+        cmd.exe /c 'sc config Themes start= disabled'
+        cmd.exe /c 'sc stop upnphost'
+        cmd.exe /c 'sc config upnphost start= disabled'
+        cmd.exe /c 'sc stop nfssvc'
+        cmd.exe /c 'sc config nfssvc start= disabled'
+        cmd.exe /c 'sc stop nfsclnt'
+        cmd.exe /c 'sc config nfsclnt start= disabled'
+        cmd.exe /c 'sc stop MSSQLServerADHelper'
+        cmd.exe /c 'sc config MSSQLServerADHelper start= disabled'
+        cmd.exe /c 'sc stop SharedAccess'
+        cmd.exe /c 'sc config SharedAccess start= disabled'
+        cmd.exe /c 'sc stop UmRdpService'
+        cmd.exe /c 'sc config UmRdpService start= disabled'
+        cmd.exe /c 'sc stop SessionEnv'
+        cmd.exe /c 'sc config SessionEnv start= disabled'
+        cmd.exe /c 'sc stop Server'
+        cmd.exe /c 'sc config Server start= disabled'
+        cmd.exe /c 'sc stop TeamViewer'
+        cmd.exe /c 'sc config TeamViewer start= disabled'
+        cmd.exe /c 'sc stop TeamViewer7'
+        cmd.exe /c 'sc config start= disabled'
+        cmd.exe /c 'sc stop HomeGroupListener'
+        cmd.exe /c 'sc config HomeGroupListener start= disabled'
+        cmd.exe /c 'sc stop HomeGroupProvider'
+        cmd.exe /c 'sc config HomeGroupProvider start= disabled'
+        cmd.exe /c 'sc stop AxInstSV'
+        cmd.exe /c 'sc config AXInstSV start= disabled'
+        cmd.exe /c 'sc stop Netlogon'
+        cmd.exe /c 'sc config Netlogon start= disabled'
+        cmd.exe /c 'sc stop lltdsvc'
+        cmd.exe /c 'sc config lltdsvc start= disabled'
+        cmd.exe /c 'sc stop iphlpsvc'
+        cmd.exe /c 'sc config iphlpsvc start= disabled'
+        cmd.exe /c 'sc stop AdobeARMservice'
+        cmd.exe /c 'sc config AdobeARMservice start= disabled'
+    }
+
 }
 
 #============================================
@@ -792,14 +957,16 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
     13. Enable Internet Security            14. Enable File Security            
     
     -- Services --
-    15. Disable Remote Desktop
+    15. Disable Remote Desktop              16. Disable Unsafe Services [untested]
 
     -- Windows --
-    16. Enable Windows Defender             17. Run Vius Scan
-    18. Enable Windows Updates
+    17. Enable Windows Defender             18. Run Vius Scan
+    19. Enable Windows Updates
 
     -- Exit --
-    19. Exit'
+    20. Exit
+    
+    '
 
     if ($option -eq 1) {
         Clear-UnapprovedUsers
@@ -816,10 +983,11 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Enable-InternetSecurity
         Enable-FileSecurity
         Disable-RemoteDesktop
+        Disable-UnsafeServices
         Enable-Defender
         Start-VirusScan
         Enable-WindowsUpdates
-        Start-Sleep -s 2
+        Start-Sleep -s 1
     }
     if ($option -eq 2) {
         Clear-UnapprovedUsers
@@ -864,15 +1032,18 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Disable-RemoteDesktop
     }
     if ($option -eq 16) {
-        Enable-Defender
+        Disable-UnsafeServices
     }
     if ($option -eq 17) {
-        Start-VirusScan
+        Enable-Defender
     }
     if ($option -eq 18) {
-        Enable-WindowsUpdates
+        Start-VirusScan
     }
     if ($option -eq 19) {
+        Enable-WindowsUpdates
+    }
+    if ($option -eq 20) {
         Exit-Script
     }
 }
