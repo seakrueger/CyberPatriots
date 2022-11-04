@@ -1,3 +1,6 @@
+# Credit for several of the commands used https://github.com/xFaraday/EzScript/blob/master/ezscript.ps1
+# Credit for several of the commands used https://github.com/ponkio/CyberPatriot/blob/master/Windows.bat
+
 #Requires -RunAsAdministrator
 param ($userfile="users.txt", $adminfile="admins.txt", $secfile="secconfig.cfg")
 
@@ -215,6 +218,9 @@ function Disable-DefaultAccounts {
     (Get-WMIObject Win32_UserAccount -Filter "Name='Guest'").Rename("DisGu")
     Write-Host "`nAdmin Account has been renamed to 'DisAd'" -ForegroundColor Yellow
     Write-Host "Guest Account has been renamed to 'DisGu'" -ForegroundColor Yellow
+
+    reg ADD "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_DWORD /d 0 /f
+
 }
 
 
@@ -227,6 +233,22 @@ function Disable-DefaultAccounts {
 function Enable-PasswordPolicy {
     Write-Host "`n--- Enforcing Password Policy ---" -ForegroundColor Blue -BackgroundColor White
     secedit.exe /configure /db C:\Windows\securitynew.sdb /cfg $secfile /areas SECURITYPOLICY
+
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v MaximumPasswordAge /t REG_DWORD /d 15 /f
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v DisableCAD /t REG_DWORD /d 0 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v LimitBlankPasswordUse /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v disabledomaincreds /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v dontdisplaylastusername /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\LanmanServer\Parameters /v autodisconnect /t REG_DWORD /d 45 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v DisablePasswordChange /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\services\Netlogon\Parameters /v RequireStrongKey /t REG_DWORD /d 1 /f
+
+
+    Write-Host "`n--- Disabling Anonymous Users ---" -ForegroundColor Yellow
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v restrictanonymous /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v restrictanonymoussam /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v everyoneincludesanonymous /t REG_DWORD /d 0 /f
+
     Write-Output (net.exe accounts)
 }
 
@@ -245,6 +267,40 @@ function Update-Passwords {
 }
 
 #============================================
+# Enable Audit Policy 
+#============================================
+# Enable audits for every attempted
+#  action by users
+#============================================
+function Enable-AuditPolicy {
+    Write-Host "`n--- Enabling Audit Policy ---" -ForegroundColor Blue -BackgroundColor White
+
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v auditbaseobjects /t REG_DWORD /d 1 /f
+    reg ADD HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v fullprivilegeauditing /t REG_DWORD /d 1 /f
+
+    auditpol /set /category:"Account Logon" /success:enable
+    auditpol /set /category:"Account Logon" /failure:enable
+    auditpol /set /category:"Account Management" /success:enable
+    auditpol /set /category:"Account Management" /failure:enable
+    auditpol /set /category:"DS Access" /success:enable
+    auditpol /set /category:"DS Access" /failure:enable
+    auditpol /set /category:"Logon/Logoff" /success:enable
+    auditpol /set /category:"Logon/Logoff" /failure:enable
+    auditpol /set /category:"Object Access" /success:enable
+    auditpol /set /category:"Object Access" /failure:enable
+    auditpol /set /category:"Policy Change" /success:enable
+    auditpol /set /category:"Policy Change" /failure:enable
+    auditpol /set /category:"Privilege Use" /success:enable
+    auditpol /set /category:"Privilege Use" /failure:enable
+    auditpol /set /category:"Detailed Tracking" /success:enable
+    auditpol /set /category:"Detailed Tracking" /failure:enable
+    auditpol /set /category:"System" /success:enable 
+    auditpol /set /category:"System" /failure:enable
+
+    Write-Host "`Succesfully enabled audit for all categories" -ForegroundColor Yellow
+}
+
+#============================================
 # Enable Firewall
 #============================================
 # Enables the firewall on the system,
@@ -256,27 +312,102 @@ function Enable-Firewall {
     Set-NetFirewallProfile -DefaultInboundAction Block -DefaultOutboundAction Allow -NotifyOnListen True -AllowUnicastResponseToMulticast True -LogFileName %SystemRoot%\System32\LogFiles\Firewall\pfirewall.log
     
     #netsh advfirewall import "C:\Users\$user\Desktop\Win10Firewall.wfw"
-    netsh advfirewall firewall set rule name="Remote Assistance (DCOM-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Remote Assistance (PNRP-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Remote Assistance (RA Server TCP-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Remote Assistance (SSDP TCP-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Remote Assistance (SSDP UDP-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Remote Assistance (TCP-In)" new enable=no 
-    netsh advfirewall firewall set rule name="Telnet Server" new enable=no 
-    netsh advfirewall firewall set rule name="netcat" new enable=no
-    netsh advfirewall firewall set rule group="Network Discovery" new enable=No
-    netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=No
+
+    # NetCat
+    $confirmation = Read-Host "Disable Netcat? [y/n]"
+    if ($confirmation -eq "y") {
+        netsh advfirewall firewall set rule name="netcat" new enable=no
+    } else {
+        netsh advfirewall firewall set rule name="netcat" new enable=yes
+    }
+
+    # Network Discovery
+    $confirmation = Read-Host "Disable Network Discovery? [y/n]"
+    if ($confirmation -eq "y") {
+        netsh advfirewall firewall set rule group="Network Discovery" new enable=No
+    } else {
+        netsh advfirewall firewall set rule group="Network Discovery" new enable=yes
+    }
+
+    # File and Printer Sharing
+    $confirmation = Read-Host "Disable File and Printer Sharing? [y/n]"
+    if ($confirmation -eq "y") {
+        netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=No
+    } else {
+        netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=yes
+    }
     
     netsh advfirewall firewall add rule name="block_RemoteRegistry_in" dir=in service="RemoteRegistry" action=block enable=yes
     netsh advfirewall firewall add rule name="block_RemoteRegistry_out" dir=out service="RemoteRegistry" action=block enable=yes
 
-    New-NetFirewallRule -DisplayName "sshTCP" -Direction Inbound -LocalPort 22 -Protocol TCP -Action Block #ssh
-    New-NetFirewallRule -DisplayName "ftpTCP" -Direction Inbound -LocalPort 21 -Protocol TCP -Action Block #ftp
-    New-NetFirewallRule -DisplayName "telnetTCP" -Direction Inbound -LocalPort 23 -Protocol TCP -Action Block #telnet
-    New-NetFirewallRule -DisplayName "SMTPTCP" -Direction Inbound -LocalPort 25 -Protocol TCP -Action Block #SMTP
-    New-NetFirewallRule -DisplayName "POP3TCP" -Direction Inbound -LocalPort 110 -Protocol TCP -Action Block #POP3
-    New-NetFirewallRule -DisplayName "SNMPTCP" -Direction Inbound -LocalPort 161 -Protocol TCP -Action Block #SNMP
-    New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Block #RDP
+    # FTP
+    $confirmation = Read-Host "Disable FTP? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "ftpTCP" -Direction Inbound -LocalPort 21 -Protocol TCP -Action Block
+        dism /online /disable-feature /featurename:IIS-FTPServer
+	    dism /online /disable-feature /featurename:IIS-FTPSvc
+	    dism /online /disable-feature /featurename:IIS-FTPExtensibility
+	    dism /online /disable-feature /featurename:TFTP    
+    } else {
+        New-NetFirewallRule -DisplayName "ftpTCP" -Direction Inbound -LocalPort 21 -Protocol TCP -Action Allow
+        dism /online /enable-feature /featurename:IIS-FTPServer
+	    dism /online /enable-feature /featurename:IIS-FTPSvc
+	    dism /online /enable-feature /featurename:IIS-FTPExtensibility
+	    dism /online /enable-feature /featurename:TFTP
+    }
+    
+    # SSH
+    $confirmation = Read-Host "Disable SSH? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "sshTCP" -Direction Inbound -LocalPort 22 -Protocol TCP -Action Block
+    } else {
+        New-NetFirewallRule -DisplayName "sshTCP" -Direction Inbound -LocalPort 22 -Protocol TCP -Action Allow
+    }
+
+    # Telnet
+    $confirmation = Read-Host "Disable Telnet? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "telnetTCP" -Direction Inbound -LocalPort 23 -Protocol TCP -Action Block
+        netsh advfirewall firewall set rule name="Telnet Server" new enable=no 
+        dism /online /disable-feature /featurename:TelnetClient
+	    dism /online /disable-feature /featurename:TelnetServer
+    } else {
+        New-NetFirewallRule -DisplayName "telnetTCP" -Direction Inbound -LocalPort 23 -Protocol TCP -Action Allow
+        netsh advfirewall firewall set rule name="Telnet Server" new enable=yes
+        dism /online /enable-feature /featurename:TelnetClient
+	    dism /online /enable-feature /featurename:TelnetServer
+    }
+
+    # SMTP
+    $confirmation = Read-Host "Disable SMTP? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "SMTPTCP" -Direction Inbound -LocalPort 25 -Protocol TCP -Action Block
+    } else {
+        New-NetFirewallRule -DisplayName "SMTPTCP" -Direction Inbound -LocalPort 25 -Protocol TCP -Action Allow
+    }
+    
+    # SMTP
+    $confirmation = Read-Host "Disable POP3? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "POP3TCP" -Direction Inbound -LocalPort 110 -Protocol TCP -Action Block
+    } else {
+        New-NetFirewallRule -DisplayName "POP3TCP" -Direction Inbound -LocalPort 110 -Protocol TCP -Action Allow
+    }
+
+    # SNMP
+    $confirmation = Read-Host "Disable SNMP? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "SNMPTCP" -Direction Inbound -LocalPort 161 -Protocol TCP -Action Block
+    } else {
+        New-NetFirewallRule -DisplayName "SNMPTCP" -Direction Inbound -LocalPort 161 -Protocol TCP -Action Allow
+    }
+
+    $confirmation = Read-Host "Disable RDP? [y/n]"
+    if ($confirmation -eq "y") {
+        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Block
+    } else {
+        New-NetFirewallRule -DisplayName "RDPTCP" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow
+    }
 
     Set-NetConnectionProfile -NetworkCategory Public
     Remove-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24" -Name "Category" -ErrorAction SilentlyContinue
@@ -284,6 +415,106 @@ function Enable-Firewall {
     Write-Output (Get-NetFirewallProfile | Format-Table Name, Enabled)
 }
 
+#============================================
+# Disable Remote Desktop
+#============================================
+# Disables remote desktop on the system,
+#  some Server may need this service on
+#============================================
+function Disable-RemoteDesktop {
+    Write-Host "`n--- Disabling Remote Desktop ---" -ForegroundColor Blue -BackgroundColor White
+    # Remote Assistance
+    $confirmation = Read-Host "Disable Remote Assistance? [y/n]"
+    if ($confirmation -eq "y") {
+        netsh advfirewall firewall set rule name="Remote Assistance (DCOM-In)" new enable=no 
+        netsh advfirewall firewall set rule name="Remote Assistance (PNRP-In)" new enable=no 
+        netsh advfirewall firewall set rule name="Remote Assistance (RA Server TCP-In)" new enable=no 
+        netsh advfirewall firewall set rule name="Remote Assistance (SSDP TCP-In)" new enable=no 
+        netsh advfirewall firewall set rule name="Remote Assistance (SSDP UDP-In)" new enable=no 
+        netsh advfirewall firewall set rule name="Remote Assistance (TCP-In)" new enable=no 
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 1 /f
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v AllowTSConnections /t REG_DWORD /d 0 /f
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fAllowToGetHelp /t REG_DWORD /d 0 /f
+        reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows NT\Terminal Services" /v "AllowSignedFiles" /t REG_DWORD /d 0 /f
+        reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows NT\Terminal Services" /v "AllowUnsignedFiles" /t REG_DWORD /d 0 /f
+        reg add "HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows NT\Terminal Services" /v "DisablePasswordSaving" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Conferencing" /v "NoRDS" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service\WinRS" /v "AllowRemoteShellAccess" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "AllowSignedFiles" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "AllowUnsignedFiles" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "CreateEncryptedOnlyTickets" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "DisablePasswordSaving" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "fAllowToGetHelp" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "fAllowUnsolicited" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "fDenyTSConnections" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" /v "fEnableUsbBlockDeviceBySetupClass" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" /v "fEnableUsbNoAckIsochWriteToDevice" /t REG_DWORD /d 80 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" /v "fEnableUsbSelectDeviceByInterface" /t REG_DWORD /d 1 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\RemoteAdminSettings" /v "Enabled" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\Services\RemoteDesktop" /v "Enabled" /t REG_DWORD /d 0 /f
+        reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsFirewall\StandardProfile\Services\UPnPFramework" /v "Enabled" /t REG_DWORD /d 0 /f
+    }
+}
+
+#============================================
+# Disable Internet Information Services
+#============================================
+# Disable IIS services that other scripts
+#  have deemed disable-able
+#============================================
+function Disable-IIS {
+    Write-Host "`n--- Disabling IIS Services ---" -ForegroundColor Blue -BackgroundColor White
+
+    dism /online /disable-feature /featurename:IIS-WebServerRole
+	dism /online /disable-feature /featurename:IIS-WebServer
+	dism /online /disable-feature /featurename:IIS-CommonHttpFeatures
+	dism /online /disable-feature /featurename:IIS-HttpErrors
+	dism /online /disable-feature /featurename:IIS-HttpRedirect
+	dism /online /disable-feature /featurename:IIS-ApplicationDevelopment
+	dism /online /disable-feature /featurename:IIS-NetFxExtensibility
+	dism /online /disable-feature /featurename:IIS-NetFxExtensibility45
+	dism /online /disable-feature /featurename:IIS-HealthAndDiagnostics
+	dism /online /disable-feature /featurename:IIS-HttpLogging
+	dism /online /disable-feature /featurename:IIS-LoggingLibraries
+	dism /online /disable-feature /featurename:IIS-RequestMonitor
+	dism /online /disable-feature /featurename:IIS-HttpTracing
+	dism /online /disable-feature /featurename:IIS-Security
+	dism /online /disable-feature /featurename:IIS-URLAuthorization
+	dism /online /disable-feature /featurename:IIS-RequestFiltering
+	dism /online /disable-feature /featurename:IIS-IPSecurity
+	dism /online /disable-feature /featurename:IIS-Performance
+	dism /online /disable-feature /featurename:IIS-HttpCompressionDynamic
+	dism /online /disable-feature /featurename:IIS-WebServerManagementTools
+	dism /online /disable-feature /featurename:IIS-ManagementScriptingTools
+	dism /online /disable-feature /featurename:IIS-IIS6ManagementCompatibility
+	dism /online /disable-feature /featurename:IIS-Metabase
+	dism /online /disable-feature /featurename:IIS-HostableWebCore
+	dism /online /disable-feature /featurename:IIS-StaticContent
+	dism /online /disable-feature /featurename:IIS-DefaultDocument
+	dism /online /disable-feature /featurename:IIS-DirectoryBrowsing
+	dism /online /disable-feature /featurename:IIS-WebDAV
+	dism /online /disable-feature /featurename:IIS-WebSockets
+	dism /online /disable-feature /featurename:IIS-ApplicationInit
+	dism /online /disable-feature /featurename:IIS-ASPNET
+	dism /online /disable-feature /featurename:IIS-ASPNET45
+	dism /online /disable-feature /featurename:IIS-ASP
+	dism /online /disable-feature /featurename:IIS-CGI 
+	dism /online /disable-feature /featurename:IIS-ISAPIExtensions
+	dism /online /disable-feature /featurename:IIS-ISAPIFilter
+	dism /online /disable-feature /featurename:IIS-ServerSideIncludes
+	dism /online /disable-feature /featurename:IIS-CustomLogging
+	dism /online /disable-feature /featurename:IIS-BasicAuthentication
+	dism /online /disable-feature /featurename:IIS-HttpCompressionStatic
+	dism /online /disable-feature /featurename:IIS-ManagementConsole
+	dism /online /disable-feature /featurename:IIS-ManagementService
+	dism /online /disable-feature /featurename:IIS-WMICompatibility
+	dism /online /disable-feature /featurename:IIS-LegacyScripts
+	dism /online /disable-feature /featurename:IIS-LegacySnapIn
+
+    dism /online /disable-feature /featurename:"SMB1Protocol"
+    Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+}
 
 #============================================
 # Enable Windows Defender
@@ -346,7 +577,7 @@ function Start-VirusScan {
 # Exit
 #============================================
 function Exit-Script {
-    Write-Host "`n`n --- SOME OF THIS MAY NEED A RESTART TO TAKE AFFECT --- SAME OF THIS MAY NEED A RESTART TO TAKE AFFECT ---`n" -ForegroundColor Red -BackgroundColor White
+    Write-Host "`n`n --- GOOD LUCK --- GOOD LUCK ---`n" -ForegroundColor Red -BackgroundColor White
     exit
 }
 
@@ -369,9 +600,11 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
     2. Remove Unapproved Users          3. Add Missing Users
     4. Remove Unapproved Admins         5. Add Missing Admins
     6. Disabled Default Accounts        7. Enabled Password Policy
-    8. Update Passwords                 9. Enable Firewall
-    10. Enable Windows Defender         11. Run Vius Scan
-                                        12. Exit'
+    8. Update Passwords                 9. Enable Audit Policy
+    10. Enable Firewall                 11. Disable Remote Desktop
+    12. Disable IIS                     13. Enable Windows Defender
+    14. Run Vius Scan
+                                        15. Exit'
 
     if ($option -eq 1) {
         Clear-UnapprovedUsers
@@ -381,7 +614,10 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Enable-PasswordPolicy
         Disable-DefaultAccounts
         Update-Passwords
+        Enable-AuditPolicy
         Enable-Firewall
+        Disable-RemoteDesktop
+        Disable-IIS
         Enable-Defender
         Start-VirusScan
     }
@@ -407,19 +643,30 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Update-Passwords
     }
     if ($option -eq 9) {
-        Enable-Firewall
+        Enable-AuditPolicy
     }
     if ($option -eq 10) {
-        Enable-Defender
+        Enable-Firewall
     }
     if ($option -eq 11) {
-        Run-VirusScan
+        Disable-RemoteDesktop
     }
-    if ($optin -ge 12) {
+    if ($option -eq 12) {
+        Disable-IIS
+    }
+    if ($option -eq 13) {
+        Enable-Defender
+    }
+    if ($option -eq 14) {
+        Start-VirusScan
+    }
+    if ($option -eq 15) {
         Exit-Script
     }
-
-    Start-Script
 }
 
-Start-Script
+Write-Host "`n`n --- DO THE FORENSIC QUESTIONS FIRST --- DO THE FORENSIC QUESTIONS FIRST ---`n" -ForegroundColor Red -BackgroundColor White
+Start-Sleep -s 2
+while ($true) {
+    Start-Script
+}
