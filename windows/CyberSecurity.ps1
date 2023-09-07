@@ -1,6 +1,3 @@
-# Credit for several of the commands used https://github.com/xFaraday/EzScript/blob/master/ezscript.ps1
-# Credit for several of the commands used https://github.com/ponkio/CyberPatriot/blob/master/Windows.bat
-
 #Requires -RunAsAdministrator
 param ($userfile="users.txt", $adminfile="admins.txt", $secfile="secconfig.cfg")
 
@@ -206,8 +203,8 @@ function Add-MissingAdmins {
 #============================================
 # Add New Group
 #============================================
-# Manages defualt group 
-#  account and renmaes them
+# Manages windows group 
+#   creates them and adds users
 #============================================
 function Add-NewGroup {
     Write-Host "`n--- Managing Group ---" -ForegroundColor Blue -BackgroundColor White
@@ -252,7 +249,7 @@ function Add-NewGroup {
 # Disable Default Accounts
 #============================================
 # Disables the default Guest and Admin
-#  account and renmaes them
+#  account and renames them
 #============================================
 function Disable-DefaultAccounts {
     Write-Host "`n--- Disabling Default Accounts ---" -ForegroundColor Blue -BackgroundColor White
