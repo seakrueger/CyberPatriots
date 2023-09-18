@@ -920,6 +920,30 @@ function Enable-WindowsUpdates {
 }
 
 #============================================
+# Get Installed Software
+#============================================
+# Lists all found software on computer 
+#   and offers to remove them
+#============================================
+function Get-InstalledSoftware {
+    Write-Host "`n--- Finding Installed Software  ---" -ForegroundColor Blue -BackgroundColor White
+
+    $InstalledSoftware = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    $toBeRemoveSoftware = [System.Collections.ArrayList]@()
+    foreach ($soft in $InstalledSoftware) {
+        Write-Host $soft.GetValue("DisplayName")
+    }
+ 
+    $confirmation = Read-Host "Confirm? [y/n]"
+    [string[]] $SaveList= @()
+    if ( -not ($confirmation -eq "y")) {
+        $SaveList = Read-Host "User to skip: [E.g: 0, 2, 3]"
+        $SaveList = $SaveList.Split(',').Split(' ')
+    }
+
+}
+
+#============================================
 # Exit
 #============================================
 function Exit-Script {
@@ -963,6 +987,9 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
     17. Enable Windows Defender             18. Run Vius Scan
     19. Enable Windows Updates
 
+    -- Software --
+    20. List Installed Software
+
     -- Exit --
     20. Exit
     
@@ -987,6 +1014,7 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Enable-Defender
         Start-VirusScan
         Enable-WindowsUpdates
+        Get-InstalledSoftware
         Start-Sleep -s 1
     }
     if ($option -eq 2) {
@@ -1044,6 +1072,9 @@ ____    __    ____  __  .__   __.  _______   ______   ____    __    ____   _____
         Enable-WindowsUpdates
     }
     if ($option -eq 20) {
+        Get-InstalledSoftware
+    }
+    if ($option -eq 21) {
         Exit-Script
     }
 }
