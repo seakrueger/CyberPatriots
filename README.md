@@ -2,7 +2,7 @@
 Scripts for the CyberPatriots competition 
 
 ## Windows
-Install: `Set-ExecutionPolicy unrestricted -Scope Process; wget https://raw.githubusercontent.com/skrueger-ftc/CyberPatriots/main/windows-download.ps1 -o download.ps1; .\download.ps1`
+Install: `Set-ExecutionPolicy unrestricted -Scope Process; wget https://raw.githubusercontent.com/skrueger-ftc/CyberPatriots/main/download-windows.ps1 -o download.ps1; .\download.ps1`
 
 ### Set-Up
 1. Paste the list of approved usernames and admins into the users.txt file 
@@ -15,3 +15,13 @@ Notes:
  - If the script is unable to find the path to any of the files run using `./CyberSecurity.ps1 -userfile {pathToFile} -adminfile {pathToFile} -secfile {pathToFile}`
 
 2. From there select what you want the script to do, use option 1 to run everything  
+
+## Debian
+Install: `wget -o - https://raw.githubusercontent.com/skrueger-ftc/CyberPatriots/main/download-debian.sh | bash`
+
+### Set-Up
+1. Paste users and admins into users.txt (one per line)
+2. Paste admins into admins.txt (one per line)  
+*note: running the install script and follow it's prompts will automatically add them"
+
+Run script with `sudo ./CyberSecurity.sh`
