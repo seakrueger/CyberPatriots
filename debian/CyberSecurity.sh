@@ -189,6 +189,8 @@ function updateAndUpgrade() {
     echo -e "${BLUE}--- Updating APT Packages ---${NC}"
     apt update -y
     apt upgrade -y
+    apt autoremove -y
+    apt autoclean -y
     rm -rf /var/lib/apt/lists/*
 }
 
