@@ -17,7 +17,7 @@ Notes:
 2. From there select what you want the script to do, use option 1 to run everything  
 
 ## Debian
-Install: `wget -o - https://raw.githubusercontent.com/skrueger-ftc/CyberPatriots/main/download-debian.sh | bash`
+Install: `wget -O - https://raw.githubusercontent.com/skrueger-ftc/CyberPatriots/main/download-debian.sh > install.sh; chmod +x install.sh; ./install.sh`
 
 ### Set-Up
 1. Paste users and admins into users.txt (one per line)
