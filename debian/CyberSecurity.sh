@@ -179,7 +179,6 @@ function updatePasswords {
     done
 }
 
-
 #============================================
 # Start
 #============================================
@@ -193,7 +192,7 @@ function startScript() {
 |  '--'  ||  |____ |  |_)  | |  |  /  _____  \\  |  |\\   | 
 |_______/ |_______||______/  |__| /__/     \\__\\ |__| \\__| 
                                                           
-    1. Run All
+    1. Run All <except plugins>
 
     -- Users --
     2. Remove Unapproved Users              3. Add Missing Users
@@ -203,9 +202,26 @@ function startScript() {
     -- Security --
     7. Setup Password Policy                8. Update User Passwords
 
+    -- Plugins --"
+
+    offset=8
+    count=$(( ${offset} + 1 ))
+    for entry in "$(pwd)"/*sh; do
+        entry=${entry#"$(pwd)/"}
+        if [[ ${entry} == "CyberSecurity.sh" ]]; then
+            continue
+        fi
+
+        echo "${count}. ${entry}"
+        (( count++ ))
+    done
+    negOffset=$(( ${count} - ${offset} ))
+
+    echo -e "${BLUE}
     -- Exit --
-    9. Exit
-"
+    ${count}. Exit
+${NC}"
+
     read -r option
 
     if [[ $option == "1" ]]; then
@@ -230,7 +246,21 @@ function startScript() {
         setupPasswordPolicy
     elif [[ $option == "8" ]]; then
         updatePasswords
-    elif [[ $option == "9" ]]; then
+    elif [[ $option -ge $(( ${count} - ${negOffset} )) && $option -lt $count ]]; then
+        i=1
+        for entry in "$(pwd)"/*sh; do
+            entry=${entry#"$(pwd)/"}
+            if [[ ${entry} == "CyberSecurity.sh" ]]; then
+                continue
+            fi
+
+            if [[ $i == $(( $option - $offset )) ]]; then
+                bash "./"${entry}
+            fi
+            (( i++ ))
+            sleep 0.5
+        done
+    elif [[ $option == "${count}" ]]; then
         exit
     fi
 }
