@@ -2,6 +2,8 @@
 USERS='users.txt'
 ADMINS='admins.txt'
 
+PASSWORD='SecurePassword!123'
+
 BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
@@ -101,6 +103,84 @@ function addMissingSudoers() {
 }
 
 #============================================
+# Add New Group
+#============================================
+# Creates a group 
+#   and adds users
+#============================================
+function addGroup() {
+    echo -e "${BLUE}--- Adding New Group ---${NC}"
+    read -rp "Add new group? [y/n] " confirm
+    if [[ $confirm == "y" ]]; then
+        read -rp "Group name? " name
+        read -rp "GID? <enter to skip> " gid
+
+        # Create group
+        if [[ -z "${gid}" ]]; then
+            groupadd ${name} 
+        else
+            groupadd -g ${gid} ${name}
+        fi
+
+        # Add users
+        users=(`cat /etc/passwd | grep '/home' | cut -d: -f1`)
+        echo "Users: ${users[@]}"
+        echo "Type users to be added: <\"q\" to quit>"
+        while true; do
+            read -rp ":" user
+            if [ "${user}" = "q" ]; then
+                break
+            fi
+
+            if id "$user" &>/dev/null; then
+                sudo usermod -aG "${name}" "${user}"
+            else
+                echo "User '${user}' does not exist."
+            fi
+        done
+    fi
+}
+
+#============================================
+# Enable Password Policy 
+#============================================
+# Setups a  password policy via 
+#  /etc/login.defs
+#============================================
+function setupPasswordPolicy {
+    echo -e "${BLUE}--- Setting Up Password Policy ---${NC}"
+    cp /etc/login.defs /etc/login.defs.bak
+    cp /etc/pam.d/common-password /etc/pam.d/common-password.bak
+    echo "Created backups of logins.defs and common-password"
+
+    sed -i -e '/^PASS_MAX_DAYS/ s/.*/PASS_MAX_DAYS 60/' /etc/login.defs
+    sed -i -e '/^PASS_MIN_DAYS/ s/.*/PASS_MIN_DAYS 5/' /etc/login.defs
+    sed -i -e '/^PASS_WARN_AGE/ s/.*/PASS_WARN_AGE 7/' /etc/login.defs 
+}
+
+#============================================
+# Update Passwords 
+#============================================
+# Updates the password for all Users
+#  for users and admins
+#============================================
+function updatePasswords {
+    echo -e "${BLUE}--- Updating User Passwords ---${NC}"
+    readarray -t allUsers < ${USERS}
+    for user in "${allUsers[@]}"; do
+        passwd --mindays 5 --warndays 7 --maxdays 60 ${user}
+        usermod --password $(openssl passwd -1 ${PASSWORD}) ${user} 
+    done
+
+    readarray -t allAdmins < ${ADMINS}
+    for admin in "${allAdmins[@]}"; do
+        passwd --mindays 5 --warndays 7 --maxdays 14 ${admin}
+        usermod --password $(openssl passwd -1 ${PASSWORD}) ${admin} 
+    done
+}
+
+
+#============================================
 # Start
 #============================================
 function startScript() {
@@ -118,9 +198,13 @@ function startScript() {
     -- Users --
     2. Remove Unapproved Users              3. Add Missing Users
     4. Remove Unapproved Sudoers            5. Add Missing Sudoers
+    6. Add New Group
+
+    -- Security --
+    7. Setup Password Policy                8. Update User Passwords
 
     -- Exit --
-    6. Exit
+    9. Exit
 "
     read -r option
 
@@ -129,6 +213,9 @@ function startScript() {
         addMissingUsers
         removeUnapprovedSudoers
         addMissingSudoers
+        addGroup
+        setupPasswordPolicy
+        updatePasswords
     elif [[ $option == "2" ]]; then
         removeUnapprovedUsers
     elif [[ $option == "3" ]]; then
@@ -138,6 +225,12 @@ function startScript() {
     elif [[ $option == "5" ]]; then
         addMissingSudoers
     elif [[ $option == "6" ]]; then
+        addGroup
+    elif [[ $option == "7" ]]; then
+        setupPasswordPolicy
+    elif [[ $option == "8" ]]; then
+        updatePasswords
+    elif [[ $option == "9" ]]; then
         exit
     fi
 }
