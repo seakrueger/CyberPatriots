@@ -180,6 +180,33 @@ function updatePasswords {
 }
 
 #============================================
+# Update and Upgrade 
+#============================================
+# Update apt cache and upgrade
+#  packages
+#============================================
+function updateAndUpgrade() {
+    echo -e "${BLUE}--- Updating APT Packages ---${NC}"
+    apt update -y
+    apt upgrade -y
+    rm -rf /var/lib/apt/lists/*
+}
+
+#============================================
+# Install Packages
+#============================================
+# Installs some packages that I want
+#  to have and some neccessary ones
+#============================================
+function installPackages() {
+    echo -e "${BLUE}--- Installing APT Packages ---${NC}"
+    apt install -y vim \
+        htop \
+        wget \
+        net-tools
+}
+
+#============================================
 # Start
 #============================================
 function startScript() {
@@ -202,9 +229,12 @@ function startScript() {
     -- Security --
     7. Setup Password Policy                8. Update User Passwords
 
+    -- Software --
+    9. Update and Upgrade                   10. Install packages
+
     -- Plugins --"
 
-    offset=8
+    offset=10
     count=$(( ${offset} + 1 ))
     for entry in "$(pwd)"/*sh; do
         entry=${entry#"$(pwd)/"}
@@ -232,6 +262,8 @@ ${NC}"
         addGroup
         setupPasswordPolicy
         updatePasswords
+        updateAndUpgrade
+        installPackages
     elif [[ $option == "2" ]]; then
         removeUnapprovedUsers
     elif [[ $option == "3" ]]; then
@@ -246,6 +278,10 @@ ${NC}"
         setupPasswordPolicy
     elif [[ $option == "8" ]]; then
         updatePasswords
+    elif [[ $option == "9" ]]; then
+        updateAndUpgrade
+    elif [[ $option == "10" ]]; then
+        installPackages
     elif [[ $option -ge $(( ${count} - ${negOffset} )) && $option -lt $count ]]; then
         i=1
         for entry in "$(pwd)"/*sh; do
@@ -258,7 +294,6 @@ ${NC}"
                 bash "./"${entry}
             fi
             (( i++ ))
-            sleep 0.5
         done
     elif [[ $option == "${count}" ]]; then
         exit
@@ -269,4 +304,5 @@ echo -e "${RED}--- DO THE FORESENSIC QUESTIONS FIRST --- DO THE FORENSIC QUESTIO
 sleep 2
 while true; do
    startScript 
+   sleep 1
 done
